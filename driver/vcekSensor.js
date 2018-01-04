@@ -4,7 +4,7 @@ var util = require('util');
 
 var SensorLib = require('../index');
 var Sensor = SensorLib.Sensor;
-//var logger = Sensor.getLogger('Sensor');
+var logger = Sensor.getLogger('Sensor');
 var vcek = require('../vcek');
 
 function VcekSensor(sensorInfo, options) {
@@ -13,8 +13,10 @@ function VcekSensor(sensorInfo, options) {
   Sensor.call(self, sensorInfo, options);
 
   self.sequence = self.id.split('-')[2];
-  self.prevValue = 0;
-  self.prevTime = new Date().getTime();
+  self.deviceAddress = self.id.split('-')[1];
+  self.gatewayId = self.id.split('-')[0];
+  self.lastValue = 0;
+  self.lastTime = 0;
 
   if (sensorInfo.model) {
     self.model = sensorInfo.model;
@@ -30,13 +32,19 @@ function VcekSensor(sensorInfo, options) {
       time: {}
     };
 
-    result.result[self.dataType] = data[self.sequence];
-    result.time[self.dataType] = self.prevTime = new Date().getTime();
-
-    if (data[self.sequence] !== self.prevValue) {
-      self.emit('change', result);
-      self.prevValue = data[self.sequence];
+    if (data.senderNodeId !== self.deviceAddress ||
+        data.sensorType !== self.sequence) {
+      logger.trace('Different sensor data:', data, self.id);
+      return;
     }
+
+    result.result[self.dataType] = data.value;
+    result.time[self.dataType] = self.lastTime = new Date().getTime();
+
+    logger.trace('Data event:', self.id, result);
+
+    self.emit('change', result);
+    self.lastValue = data[self.sequence];
   });
 }
 
@@ -61,7 +69,7 @@ VcekSensor.properties = {
   discoverable: false,
   addressable: true,
   recommendedInterval: 60000,
-  maxInstances: 1,
+  maxInstances: 99,
   maxRetries: 8,
   idTemplate: '{gatewayId}-{deviceAddress}-{sequence}',
   category: 'sensor'
@@ -78,8 +86,21 @@ VcekSensor.prototype._get = function (cb) {
     time: {}
   };
 
-  result.result[self.dataType] = self.prevValue;
-  result.time[self.dataType] = self.prevTime;
+  if (self.lastTime === 0) {
+    result.status = 'error';
+    result.message = 'No data';
+    if (cb) {
+      return cb(new Error('no data'), result);
+    } else {
+      self.emit('data', result);
+      return;
+    }
+  }
+
+  result.result[self.dataType] = self.lastValue;
+  result.time[self.dataType] = self.lastTime;
+
+  logger.trace('Data get:', self.id, result);
 
   if (cb) {
     return cb(null, result);
@@ -90,12 +111,12 @@ VcekSensor.prototype._get = function (cb) {
 
 VcekSensor.prototype._enableChange = function () {
   vcek.registerSensor(this.id);
-  vcek.startPolling();
+  //vcek.startPolling();
 };
 
 VcekSensor.prototype._clear = function () {
   vcek.deregisterSensor(this.id);
-  vcek.stopPolling();
+  //vcek.stopPolling();
 };
 
 module.exports = VcekSensor;

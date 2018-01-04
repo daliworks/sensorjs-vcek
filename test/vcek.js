@@ -5,7 +5,7 @@ var SerialPort = require('serialport');
 var _ = require('lodash');
 var EventEmitter = require('events').EventEmitter;
 
-var logger = require('./index').Sensor.getLogger('Sensor');
+var logger = require('log4js').getLogger('VCEK');
 
 var serialOpts = {
   baudRate: 115200,
@@ -13,13 +13,9 @@ var serialOpts = {
   //parser: SerialPort.parsers.byteDelimiter(']'.charCodeAt(0))
 };
 
-//var SERIAL_PORT_FILE = '/dev/ttyUSB0';
-//var SERIAL_PORT_FILE = '/dev/ttyS1';
-var SERIAL_PORT_FILE = '/dev/cu.usbserial-1031121A';
+var SERIAL_PORT_FILE = '/dev/cu.usbserial-A403BAF1';
 var POLLING_INTERVAL = 10000;   // 10 secs
-var DEVICE_ID = '0000';         // Only one device can be connected because polling
-                                // interval should not be shorter than 1 sec.
-var POLLING_MSG = '[' + DEVICE_ID + 'BTR]';
+var POLLING_MSG = 'AE999;AED001001;01;T;25.3;0D0A';
 //var RETRY_OPEN_INTERVAL = 3000; // 3sec
 
 function isInvalid() {
@@ -97,8 +93,6 @@ function openSerialPort(vcek, cb) {
       }
 
       //values = parseMessage(data);
-
-      //self.emit('data', values);
     });
 
     self.startPolling();
@@ -121,8 +115,6 @@ function Vcek () {
   EventEmitter.call(self);
 
   self.timer = null;
-  //self.deviceId = DEVICE_ID;
-  //self.registeredSensors = [];
 
   openSerialPort(self, openSerialCallback);
 }
@@ -141,23 +133,11 @@ Vcek.prototype.startPolling = function () {
 };
 
 Vcek.prototype.stopPolling = function () {
-  //if (this.registeredSensors.length && this.timer) {
   if (this.timer) {
     clearInterval(this.timer);
     this.timer = null;
   }
 };
-
-/*
-Vcek.prototype.registerSensor = function (id) {
-  this.registeredSensors.push(id);
-  this.registeredSensors = _.uniq(this.registeredSensors);
-};
-
-Vcek.prototype.deregisterSensor = function (id) {
-  _.pull(this.registeredSensors, id);
-};
-*/
 
 Vcek.prototype.close = function () {
   logger.info('Closing serial port');
