@@ -41,10 +41,10 @@ function VcekSensor(sensorInfo, options) {
     result.result[self.dataType] = data.value;
     result.time[self.dataType] = self.lastTime = new Date().getTime();
 
-    logger.trace('Data event:', self.id, result);
+    logger.debug('Data event:', self.id, result);
 
-    self.emit('change', result);
-    self.lastValue = data[self.sequence];
+    self.emit('data', result);
+    self.lastValue = data.value;
   });
 }
 
@@ -82,11 +82,11 @@ VcekSensor.prototype._get = function (cb) {
   var result = {
     status: 'on',
     id: self.id,
-    result: {},
+    //result: {},
     time: {}
   };
 
-  if (self.lastTime === 0) {
+  if (new Date().getTime() - self.lastTime > self.properties.recommendedInterval * 1.5) {
     result.status = 'error';
     result.message = 'No data';
     if (cb) {
@@ -97,10 +97,10 @@ VcekSensor.prototype._get = function (cb) {
     }
   }
 
-  result.result[self.dataType] = self.lastValue;
+  //result.result[self.dataType] = self.lastValue;
   result.time[self.dataType] = self.lastTime;
 
-  logger.trace('Data get:', self.id, result);
+  logger.debug('Data get:', self.id, result);
 
   if (cb) {
     return cb(null, result);
@@ -111,12 +111,10 @@ VcekSensor.prototype._get = function (cb) {
 
 VcekSensor.prototype._enableChange = function () {
   vcek.registerSensor(this.id);
-  //vcek.startPolling();
 };
 
 VcekSensor.prototype._clear = function () {
   vcek.deregisterSensor(this.id);
-  //vcek.stopPolling();
 };
 
 module.exports = VcekSensor;

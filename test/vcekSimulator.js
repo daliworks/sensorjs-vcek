@@ -15,11 +15,30 @@ var serialOpts = {
 
 var SERIAL_PORT_FILE = '/dev/cu.usbserial-A403BAF1';
 var POLLING_INTERVAL = 10000;   // 10 secs
-var POLLING_MSG = 'AE999;AED001001;01;T;25.3;0D0A';
+//var POLLING_MSG = 'AE999;AED01001;01;T;25.3;0D0A';
+var RECEIVER = 'AE999';
+var SENDER = 'AED01001';
+var SENSOR_ID = '01';
+var SENSOR_TYPE = 'T';
+var ELIMINATOR = '0D0A';
+var DELIMITER = ';';
 //var RETRY_OPEN_INTERVAL = 3000; // 3sec
 
 function isInvalid() {
   return false;
+}
+
+function generateValue() {
+  var arr = [
+    RECEIVER,
+    SENDER,
+    SENSOR_ID,
+    SENSOR_TYPE,
+    Math.round(_.random(-20.0, 300.0, true) * 10) / 10,
+    ELIMINATOR
+  ];
+
+  return arr.join(DELIMITER);
 }
 
 /*
@@ -126,8 +145,9 @@ Vcek.prototype.startPolling = function () {
 
   if (!self.timer) {
     self.timer = setInterval(function () {
-      logger.trace(POLLING_MSG, self.port.isOpen());
-      self.port.write(POLLING_MSG);
+      var msg = generateValue();
+      logger.trace(msg, self.port.isOpen());
+      self.port.write(msg);
     }, POLLING_INTERVAL);
   }
 };

@@ -29,7 +29,7 @@ function parseMessage(data) {
   result.senderNodeId = dataArray[1];
   result.sensorId = dataArray[2];
   result.sensorType = dataArray[3];
-  result.value = parseInt(dataArray[4]);
+  result.value = parseFloat(dataArray[4]);
 
   logger.trace('Parsed:', result);
 
@@ -119,26 +119,6 @@ function Vcek () {
 }
 
 util.inherits(Vcek, EventEmitter);
-
-/*
-Vcek.prototype.startPolling = function () {
-  var self = this;
-
-  if (!self.timer) {
-    self.timer = setInterval(function () {
-      logger.trace(POLLING_MSG, self.port.isOpen());
-      self.port.write(POLLING_MSG);
-    }, POLLING_INTERVAL);
-  }
-};
-
-Vcek.prototype.stopPolling = function () {
-  if (this.registeredSensors.length && this.timer) {
-    clearInterval(this.timer);
-    this.timer = null;
-  }
-};
-*/
 
 Vcek.prototype.registerSensor = function (id) {
   this.registeredSensors.push(id);
