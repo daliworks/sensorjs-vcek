@@ -21,6 +21,30 @@ function parseMessage(data) {
   var dataArray = new Buffer(data).toString().split(';');
   var error;
 
+  if (dataArray.length > 6) {
+    error = new Error('Too many items: ' + dataArray.length);
+  } else if (dataArray.length < 6) {
+    error = new Error('Missing item. The number of item: ' + dataArray.length);
+  } else if (dataArray[0].length > 6) {
+    error = new Error('Too long receiver node ID: ' + dataArray[0].length);
+  } else if (dataArray[1].length > 6) {
+    error = new Error('Too long sender node ID: ' + dataArray[1].length);
+  } else if (dataArray[2].length > 3) {
+    error = new Error('Too long sensor ID: ' + dataArray[2].length);
+  } else if (dataArray[3].length > 1) {
+    error = new Error('Too long sensor type: ' + dataArray[3].length);
+  } else if (dataArray[0].length === 0) {
+    error = new Error('No receiver node ID');
+  } else if (dataArray[1].length === 0) {
+    error = new Error('No sender node ID');
+  } else if (dataArray[2].length === 0) {
+    error = new Error('No sensor ID');
+  } else if (dataArray[3].length === 0) {
+    error = new Error('No sensor type');
+  } else if (dataArray[4].length === 0) {
+    error = new Error('No value');
+  }
+
   result.receiverNodeId = dataArray[0];
   result.senderNodeId = dataArray[1];
   result.sensorId = dataArray[2];
@@ -29,39 +53,15 @@ function parseMessage(data) {
 
   logger.trace('Parsed:', result);
 
-  if (result.length > 6) {
-    error = new Error('Too many items: ' + result.length);
-  } else if (result.length === 0) {
-    error = new Error('No delimiter');
-  } else if (result.receiverNodeId.length > 6) {
-    error = new Error('Too long receiver node ID: ' + result.receiverNodeId.length);
-  } else if (result.senderNodeId.length > 6) {
-    error = new Error('Too long sender node ID: ' + result.senderNodeId.length);
-  } else if (result.sensorId.length > 3) {
-    error = new Error('Too long sensor ID: ' + result.sensorId.length);
-  } else if (result.sensorType.length > 1) {
-    error = new Error('Too long sensor type: ' + result.sensorType.length);
-  } else if (result.receiverNodeId.length === 0) {
-    error = new Error('No receiver node ID');
-  } else if (result.senderNodeId.length === 0) {
-    error = new Error('No sender node ID');
-  } else if (result.sensorId.length === 0) {
-    error = new Error('No sensor ID');
-  } else if (result.sensorType.length === 0) {
-    error = new Error('No sensor type');
-  } else if (result.value.length === 0) {
-    error = new Error('No value');
-  }
-
   return error || result;
 }
 
-function openSerialPort(vcek, cb) {
+function openSerialPort(vcek, errorCb) {
   var self;
 
   if (_.isFunction(vcek)) {
     self = module.exports;
-    cb = vcek;
+    errorCb = vcek;
   } else {
     self = vcek;
   }
@@ -72,7 +72,7 @@ function openSerialPort(vcek, cb) {
     if (err) {
       logger.error('Serial port error during opening:', err);
 
-      return cb && cb(err);
+      return errorCb && errorCb(err);     // Call error callback only when error during opening
     } else {
       logger.info('[Vcek] No err, Connected');
     }
@@ -83,7 +83,7 @@ function openSerialPort(vcek, cb) {
       return;
     });
 
-    self.port.on('close', function onError(err) {
+    self.port.on('close', function onClose(err) {
       if (err) {
         logger.error('Serial port error during closing:', err);
         // TODO: if error, isn't this closed?
@@ -94,13 +94,11 @@ function openSerialPort(vcek, cb) {
       return;
     });
 
-    self.port.on('disconnect', function onError(err) {
+    self.port.on('disconnect', function onDisconnect(err) {
       logger.error('Serial port is disconnected:', err);
 
       return;
     });
-
-    self.isOpen = true;
 
     self.port.on('data', function onData(data) {
       var parsedData;
@@ -109,14 +107,19 @@ function openSerialPort(vcek, cb) {
 
       parsedData = parseMessage(data);
 
+      if (parsedData instanceof Error) {
+        logger.error(parsedData);
+        return;
+      }
+
       self.emit(parsedData.sensorType, parsedData);
     });
   });
 }
 
-function openSerialCallback(/*err*/) {
+function openSerialErrorCallback(/*err*/) {
   setTimeout(function () {
-    openSerialPort(openSerialCallback);
+    openSerialPort(openSerialErrorCallback);
   }, RETRY_OPEN_INTERVAL);
 }
 
@@ -129,7 +132,7 @@ function Vcek () {
   self.timer = null;
   //self.registeredSensors = [];
 
-  openSerialPort(self, openSerialCallback);
+  openSerialPort(self, openSerialErrorCallback);
 }
 
 util.inherits(Vcek, EventEmitter);

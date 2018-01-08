@@ -10,20 +10,17 @@ var logger = require('log4js').getLogger('VCEK');
 
 var serialOpts = {
   baudRate: 115200,
-  parity: 'none',
-  //parser: SerialPort.parsers.byteDelimiter(']'.charCodeAt(0))
+  parity: 'none'
 };
 
+var ERROR_TEST = false;
 var SERIAL_PORT_FILE = '/dev/cu.usbserial-A403BAF1';
 var POLLING_INTERVAL = 10000;   // 10 secs
-//var POLLING_MSG = 'AE999;AED01001;01;T;25.3;0D0A';
-//var RECEIVER = 'AE999';
-//var SENDER = 'AED01001';
-//var SENSOR_ID = '01';
-//var SENSOR_TYPE = 'T';
+var RETRY_OPEN_INTERVAL = 3000; // 3 secs
 var ELIMINATOR = '0D0A';
 var DELIMITER = ';';
-//var RETRY_OPEN_INTERVAL = 3000; // 3sec
+
+logger.setLevel('INFO');
 
 var devices = [
   {
@@ -88,8 +85,66 @@ var devices = [
   }
 ];
 
-function isInvalid() {
-  return false;
+function makeErrorCase(arr) {
+  var result = arr;
+  var rand;
+
+  if (ERROR_TEST && arr[3] === 'T') {
+    rand = _.random(0, 10);
+    logger.info('random:', rand);
+
+    switch (rand) {
+    case 0:       // Too many items
+      logger.warn('Too many items');
+      result.unshift('DUMMY');
+      break;
+    case 1:       // No delimiter
+      logger.warn('Missing item');
+      result = [ELIMINATOR];
+      break;
+    case 2:       // Too long receiver node ID
+      logger.warn('Too long receiver node ID');
+      result[0] += 'EEE';
+      break;
+    case 3:       // Too long sender node ID
+      logger.warn('Too long sender node ID');
+      result[1] += 'EEE';
+      break;
+    case 4:       // Too long sensor ID
+      logger.warn('Too long sensor ID');
+      result[2] += 'EEE';
+      break;
+    case 5:       // Too long sensor type
+      logger.warn('Too long sensor type');
+      result[3] += 'EEE';
+      break;
+    case 6:       // No receiver node ID
+      logger.warn('No receiver node ID');
+      result[0] = '';
+      break;
+    case 7:       // No sender node ID
+      logger.warn('No sender node ID');
+      result[1] = '';
+      break;
+    case 8:       // No sensor ID
+      logger.warn('No sensor ID');
+      result[2] = '';
+      break;
+    case 9:       // No sensor type
+      logger.warn('No sensor type');
+      result[3] = '';
+      break;
+    case 10:      // No value
+      logger.warn('No value');
+      result[4] = '';
+      break;
+    default:
+      logger.fatal('No case');
+      break;
+    }
+  }
+
+  return result;
 }
 
 function generateValue(receiver, sender, sensorId, sensorType) {
@@ -139,6 +194,8 @@ function generateValue(receiver, sender, sensorId, sensorType) {
 
   arr.push(Math.round(_.random(min, max, true) * precision) / precision);
   arr.push(ELIMINATOR);
+  arr = makeErrorCase(arr);
+
   return arr.join(DELIMITER);
 }
 
@@ -189,17 +246,7 @@ function openSerialPort(vcek, cb) {
     self.isOpen = true;
 
     self.port.on('data', function onData(data) {
-      //var values;
-
       logger.trace('[Vcek] onData():', new Buffer(data).toString());
-
-      if (isInvalid(data)) {
-        logger.error('Invalid message:', new Buffer(data).toString());
-
-        return;
-      }
-
-      //values = parseMessage(data);
     });
 
     self.startPolling();
@@ -207,14 +254,11 @@ function openSerialPort(vcek, cb) {
 }
 
 function openSerialCallback(/*err*/) {
-  /*
   setTimeout(function () {
     openSerialPort(openSerialCallback);
   }, RETRY_OPEN_INTERVAL);
-  */
 }
 
-// TODO: Find serial port file. ttyUSB0 or ttyS1(E220)
 // TODO: If opening port takes long time, async function cannot be finished.
 function Vcek () {
   var self = this;
