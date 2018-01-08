@@ -129,24 +129,10 @@ function Vcek () {
 
   EventEmitter.call(self);
 
-  self.timer = null;
-  //self.registeredSensors = [];
-
   openSerialPort(self, openSerialErrorCallback);
 }
 
 util.inherits(Vcek, EventEmitter);
-
-/*
-Vcek.prototype.registerSensor = function (id) {
-  this.registeredSensors.push(id);
-  this.registeredSensors = _.uniq(this.registeredSensors);
-};
-
-Vcek.prototype.deregisterSensor = function (id) {
-  _.pull(this.registeredSensors, id);
-};
-*/
 
 Vcek.prototype.close = function () {
   logger.info('Closing serial port');

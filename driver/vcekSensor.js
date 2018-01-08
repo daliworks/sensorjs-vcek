@@ -15,7 +15,6 @@ function VcekSensor(sensorInfo, options) {
   self.sequence = self.id.split('-')[2];
   self.deviceAddress = self.id.split('-')[1];
   self.gatewayId = self.id.split('-')[0];
-  self.lastValue = 0;
   self.lastTime = 0;
 
   if (sensorInfo.model) {
@@ -43,7 +42,6 @@ function VcekSensor(sensorInfo, options) {
     logger.debug('Data event:', self.id, result);
 
     self.emit('data', result);
-    self.lastValue = data.value;
   });
 }
 
@@ -96,7 +94,6 @@ VcekSensor.prototype._get = function (cb) {
     }
   }
 
-  //result.result[self.dataType] = self.lastValue;
   result.time[self.dataType] = self.lastTime;
 
   logger.debug('Data get:', self.id, result);
@@ -109,11 +106,9 @@ VcekSensor.prototype._get = function (cb) {
 };
 
 VcekSensor.prototype._enableChange = function () {
-  //vcek.registerSensor(this.id);
 };
 
 VcekSensor.prototype._clear = function () {
-  //vcek.deregisterSensor(this.id);
 };
 
 module.exports = VcekSensor;
