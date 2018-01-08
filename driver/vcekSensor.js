@@ -24,7 +24,7 @@ function VcekSensor(sensorInfo, options) {
 
   self.dataType = VcekSensor.properties.dataTypes[self.model][0];
 
-  vcek.on('data', function onData(data) {
+  vcek.on(self.sequence, function onData(data) {
     var result = {
       status: 'on',
       id: self.id,
@@ -32,9 +32,8 @@ function VcekSensor(sensorInfo, options) {
       time: {}
     };
 
-    if (data.senderNodeId !== self.deviceAddress ||
-        data.sensorType !== self.sequence) {
-      logger.trace('Different sensor data:', data, self.id);
+    if (data.senderNodeId !== self.deviceAddress) {
+      logger.trace('Different device:', data.senderNodeId, self.deviceAddress);
       return;
     }
 
@@ -110,11 +109,11 @@ VcekSensor.prototype._get = function (cb) {
 };
 
 VcekSensor.prototype._enableChange = function () {
-  vcek.registerSensor(this.id);
+  //vcek.registerSensor(this.id);
 };
 
 VcekSensor.prototype._clear = function () {
-  vcek.deregisterSensor(this.id);
+  //vcek.deregisterSensor(this.id);
 };
 
 module.exports = VcekSensor;

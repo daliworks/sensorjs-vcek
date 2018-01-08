@@ -14,16 +14,12 @@ var serialOpts = {
 };
 
 var SERIAL_PORT_FILE = '/dev/ttyS0';
-//var POLLING_INTERVAL = 1000;    // 1 sec
 var RETRY_OPEN_INTERVAL = 3000; // 3sec
-
-function isInvalid() {
-  return false;
-}
 
 function parseMessage(data) {
   var result = {};
   var dataArray = new Buffer(data).toString().split(';');
+  var error;
 
   result.receiverNodeId = dataArray[0];
   result.senderNodeId = dataArray[1];
@@ -33,7 +29,31 @@ function parseMessage(data) {
 
   logger.trace('Parsed:', result);
 
-  return result;
+  if (result.length > 6) {
+    error = new Error('Too many items: ' + result.length);
+  } else if (result.length === 0) {
+    error = new Error('No delimiter');
+  } else if (result.receiverNodeId.length > 6) {
+    error = new Error('Too long receiver node ID: ' + result.receiverNodeId.length);
+  } else if (result.senderNodeId.length > 6) {
+    error = new Error('Too long sender node ID: ' + result.senderNodeId.length);
+  } else if (result.sensorId.length > 3) {
+    error = new Error('Too long sensor ID: ' + result.sensorId.length);
+  } else if (result.sensorType.length > 1) {
+    error = new Error('Too long sensor type: ' + result.sensorType.length);
+  } else if (result.receiverNodeId.length === 0) {
+    error = new Error('No receiver node ID');
+  } else if (result.senderNodeId.length === 0) {
+    error = new Error('No sender node ID');
+  } else if (result.sensorId.length === 0) {
+    error = new Error('No sensor ID');
+  } else if (result.sensorType.length === 0) {
+    error = new Error('No sensor type');
+  } else if (result.value.length === 0) {
+    error = new Error('No value');
+  }
+
+  return error || result;
 }
 
 function openSerialPort(vcek, cb) {
@@ -87,15 +107,9 @@ function openSerialPort(vcek, cb) {
 
       logger.trace('[Vcek] onData():', new Buffer(data).toString());
 
-      if (isInvalid(data)) {
-        logger.error('Invalid message:', new Buffer(data).toString());
-
-        return;
-      }
-
       parsedData = parseMessage(data);
 
-      self.emit('data', parsedData);
+      self.emit(parsedData.sensorType, parsedData);
     });
   });
 }
@@ -113,13 +127,14 @@ function Vcek () {
   EventEmitter.call(self);
 
   self.timer = null;
-  self.registeredSensors = [];
+  //self.registeredSensors = [];
 
   openSerialPort(self, openSerialCallback);
 }
 
 util.inherits(Vcek, EventEmitter);
 
+/*
 Vcek.prototype.registerSensor = function (id) {
   this.registeredSensors.push(id);
   this.registeredSensors = _.uniq(this.registeredSensors);
@@ -128,6 +143,7 @@ Vcek.prototype.registerSensor = function (id) {
 Vcek.prototype.deregisterSensor = function (id) {
   _.pull(this.registeredSensors, id);
 };
+*/
 
 Vcek.prototype.close = function () {
   logger.info('Closing serial port');

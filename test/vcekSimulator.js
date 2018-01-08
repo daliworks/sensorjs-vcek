@@ -1,10 +1,11 @@
 'use strict';
 
 var util = require('util');
-var SerialPort = require('serialport');
-var _ = require('lodash');
 var EventEmitter = require('events').EventEmitter;
 
+var SerialPort = require('serialport');
+var _ = require('lodash');
+var async = require('async');
 var logger = require('log4js').getLogger('VCEK');
 
 var serialOpts = {
@@ -16,43 +17,130 @@ var serialOpts = {
 var SERIAL_PORT_FILE = '/dev/cu.usbserial-A403BAF1';
 var POLLING_INTERVAL = 10000;   // 10 secs
 //var POLLING_MSG = 'AE999;AED01001;01;T;25.3;0D0A';
-var RECEIVER = 'AE999';
-var SENDER = 'AED01001';
-var SENSOR_ID = '01';
-var SENSOR_TYPE = 'T';
+//var RECEIVER = 'AE999';
+//var SENDER = 'AED01001';
+//var SENSOR_ID = '01';
+//var SENSOR_TYPE = 'T';
 var ELIMINATOR = '0D0A';
 var DELIMITER = ';';
 //var RETRY_OPEN_INTERVAL = 3000; // 3sec
+
+var devices = [
+  {
+    receiver: 'AE999',
+    sender: 'AE0001',
+    sensors: [
+      {
+        id: '001',
+        type: 'T'
+      },
+      {
+        id: '002',
+        type: 'H'
+      },
+      {
+        id: '003',
+        type: 'N'
+      },
+      {
+        id: '004',
+        type: 'D'
+      },
+      {
+        id: '005',
+        type: 'L'
+      },
+      {
+        id: '006',
+        type: 'W'
+      }
+    ]
+  },
+  {
+    receiver: 'AE999',
+    sender: 'AE0002',
+    sensors: [
+      {
+        id: '001',
+        type: 'T'
+      },
+      {
+        id: '002',
+        type: 'H'
+      },
+      {
+        id: '003',
+        type: 'N'
+      },
+      {
+        id: '004',
+        type: 'D'
+      },
+      {
+        id: '005',
+        type: 'L'
+      },
+      {
+        id: '006',
+        type: 'W'
+      }
+    ]
+  }
+];
 
 function isInvalid() {
   return false;
 }
 
-function generateValue() {
+function generateValue(receiver, sender, sensorId, sensorType) {
+  var tbl = {
+    T: {
+      min: -20,
+      max: 300,
+      precision: 10
+    },
+    H: {
+      min: 0,
+      max: 100,
+      precision: 10
+    },
+    N: {
+      min: 0,
+      max: 150,
+      precision: 1
+    },
+    D: {
+      min: 0,
+      max: 500,
+      precision: 10
+    },
+    L: {
+      min: 0,
+      max: 150000,
+      precision: 1
+    },
+    W: {
+      min: 0,
+      max: 1000,
+      precision: 10
+    }
+  };
+
   var arr = [
-    RECEIVER,
-    SENDER,
-    SENSOR_ID,
-    SENSOR_TYPE,
-    Math.round(_.random(-20.0, 300.0, true) * 10) / 10,
-    ELIMINATOR
+    receiver,
+    sender,
+    sensorId,
+    sensorType
   ];
 
+  var min = tbl[sensorType].min;
+  var max = tbl[sensorType].max;
+  var precision = tbl[sensorType].precision;
+
+  arr.push(Math.round(_.random(min, max, true) * precision) / precision);
+  arr.push(ELIMINATOR);
   return arr.join(DELIMITER);
 }
-
-/*
-function parseMessage(data) {
-  var result = {};
-  var dataArray = new Buffer(data).toString().split(',');
-
-  result.totalIn = parseInt(dataArray[1]);
-  result.totalOut = parseInt(dataArray[2]);
-  result.current = parseInt(dataArray[3]);
-
-  return result;
-}
-*/
 
 function openSerialPort(vcek, cb) {
   var self;
@@ -145,9 +233,32 @@ Vcek.prototype.startPolling = function () {
 
   if (!self.timer) {
     self.timer = setInterval(function () {
-      var msg = generateValue();
-      logger.trace(msg, self.port.isOpen());
-      self.port.write(msg);
+      async.eachSeries(devices, function (device, done) {
+        async.eachSeries(device.sensors, function (sensor, done2) {
+          var msg = generateValue(device.receiver, device.sender, sensor.id, sensor.type);
+
+          logger.info(msg, self.port.isOpen());
+          self.port.write(msg, function (err) {
+            if (err) {
+              logger.error('Write Error:', err);
+            } else {
+              logger.trace('Write Done');
+            }
+
+            self.port.drain(function (err2) {
+              if (err2) {
+                logger.error('Drain Error:', err2);
+              } else {
+                logger.trace('Drain Done');
+              }
+
+              done2(err);
+            });
+          });
+        }, function (err) {
+          done(err);
+        });
+      });
     }, POLLING_INTERVAL);
   }
 };
